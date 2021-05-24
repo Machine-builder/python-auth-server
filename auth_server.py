@@ -38,7 +38,12 @@ def get_active_product_keys() -> list:
     # individual machine id
     raw_product_keys = [i for i in content.split('\n') if (i and not i.startswith('//'))]
 
-    product_keys = [authentication.product_key(raw_key, True) for raw_key in raw_product_keys]
+    product_keys = []
+    for raw_key in raw_product_keys:
+        try:
+            product_keys.append(authentication.product_key(raw_key, True))
+        except:
+            logging.warn(f"could not load product key : {raw_key}")
 
     return product_keys
 
