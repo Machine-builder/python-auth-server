@@ -79,20 +79,18 @@ while server_running:
             if event == 'validate_key':
                 # verify the provided key
                 machine_key = message.data.get('key',None)
-                found_key = None
+
+                validity = 'unknown'
 
                 for key in active_product_keys:
                     if key.key == machine_key:
-                        found_key:authentication.product_key = key
-                        break
+                        if not key.is_valid():
+                            validity = 'invalid'
+                        else:
+                            validity = 'valid'
+                            break
                 
-                if found_key is not None:
-                    if found_key.is_valid():
-                        response = {"validity": "valid"}
-                    else:
-                        response = {"validity": "invalid"}
-                else:
-                    response = {"validity": "unknown"}
+                response = {"validity": validity}
                 
                 logging.info(f"send message to conn {message.from_conn} {response}")
                 try:
