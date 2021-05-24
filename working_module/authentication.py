@@ -68,8 +68,12 @@ class product_key(object):
     @staticmethod
     def get_personal_key(last_for:int=second_times.week*2):
         """defaults to last for 2 weeks"""
+        return product_key.get_key(unique_key().key, last_for)
+    
+    @staticmethod
+    def get_key(machine_id, last_for:int=second_times.week*2):
         return product_key({
-            "key": unique_key().key,
+            "key": machine_id,
             "valid_until": time.time()+last_for,
             "created_at": time.time()
         })
@@ -84,6 +88,11 @@ class product_key(object):
     def is_valid(self) -> bool:
         if self.valid_until == -1: return True
         return self.valid_until > time.time()
+    
+    def as_full_key_str(self):
+        json_v = self.as_json()
+        str_v = json.dumps(json_v)
+        return encryption.encrypt_str(str_v)
 
 
 def is_system_valid():
@@ -94,7 +103,7 @@ def is_system_valid():
     logging.info("initialise tcp client")
     client = connections.SCS_CLIENT()
 
-    server_ip = "192.168.15.17"
+    server_ip = "45.63.24.247"
     server_port = 13294
 
     logging.info(f"connect to server: {server_ip}:{server_port}")
@@ -106,15 +115,24 @@ def is_system_valid():
     }
     client.hsend_o(send_data)
 
+    stop_when = time.time()+6.5
+
     recv_resp = False
     while not recv_resp:
-        messages, _ = client.get_new_messages(True,True)
-
+        messages, _ = client.get_new_messages(False,False)
         if len(messages) > 0:
             recv_resp = True
+        if time.time() > stop_when:
+            break
 
+    if len(messages) < 1:
+        return 'error'
+    
     response = messages[0].data
-    print(response)
+    
+    state = response.get('validity',None)
 
     client.conn.close()
+
+    return state
         
