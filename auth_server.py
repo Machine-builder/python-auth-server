@@ -43,16 +43,18 @@ def get_active_product_keys() -> list:
         try:
             product_keys.append(authentication.product_key(raw_key, True))
         except:
-            logging.warn(f"could not load product key : {raw_key}")
+            logging.warning(f"could not load product key : {raw_key}")
 
     return product_keys
-
 
 
 server_addr = (
     connections.getLocalIP(),
     13294
 )
+
+print("Starting server")
+print(server_addr)
 
 server = connections.SERVER(server_addr)
 system = connections.ServerClientSystem(server)
