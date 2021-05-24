@@ -18,39 +18,24 @@ with open('auth_server.pass','r') as f:
     auth_server_pass = f.readline().strip()
 
 
+def get_product_key_json() -> list:
+    logging.info("function: get_product_key_json() called")
+    with open('./product_keys.json','r') as f:
+        return json.load(f)
+
 
 def get_active_product_keys() -> list:
     logging.info("function: get_active_product_keys() called")
-
-    # setup some basic variables to track things that
-    # will be needed to create the github api url
-    owner = 'Machine-builder'
-    repo = 'py-authentication'
-    path = 'identifiers_ec.ids'
-
-    logging.info("getting github api response")
-    # request from the github api
-    url = 'https://api.github.com/repos/{owner}/{repo}/contents/{path}'.format(
-        owner=owner, repo=repo, path=path)
-    
-    logging.info('downloading file')
-    resp = json.loads(request_html.request_page(url))
-    download_url = resp['download_url']
-    # get the actual file contents from the download_url
-    content = request_html.request_page(download_url)
-
-    # split the text up per line, to get each
-    # individual machine id
-    raw_product_keys = [i for i in content.split('\n') if (i and not i.startswith('//'))]
-
+    raw_product_keys = [entry['key'] for entry in get_product_key_json()]
     product_keys = []
     for raw_key in raw_product_keys:
         try:
             product_keys.append(authentication.product_key(raw_key, True))
         except:
             logging.warning(f"could not load product key : {raw_key}")
-
     return product_keys
+
+
 
 
 
@@ -70,11 +55,11 @@ logging.info(f"server address {server_addr[0]}:{server_addr[1]}")
 
 server_running = True
 
+admin_conns = []
+
 while server_running:
 
     clients, messages, disconnected = system.main()
-
-    admin_conns = []
 
     for new_client in clients:
         conn, addr = new_client
@@ -122,10 +107,11 @@ while server_running:
                     if from_conn is not None:
                         admin_conns.append(from_conn)
                     response = {"response": "success"}
-                    logging.log(f"conn authorised as admin: {from_conn}")
+                    logging.info(f"conn authorised as admin: {from_conn}")
                 else:
                     response = {"response": "fail"}
-                    logging.log(f"conn authorised as admin: {from_conn}")
+                    logging.info(f"conn authorised as admin: {from_conn}")
+                
                 system.send_to_conn(from_conn, response)
             
             elif event == 'admin_ping':
@@ -134,6 +120,23 @@ while server_running:
                 else:
                     response = {"response": "auth_needed"}
                 system.send_to_conn(from_conn, response)
+            
+            elif event == 'product_keys_get':
+                if from_conn in admin_conns:
+                    response = {
+                        "response": "accepted",
+                        "product_keys": get_product_key_json()
+                    }
+                    system.send_to_conn(from_conn, response)
+            
+            elif event == 'product_keys_set':
+                if from_conn in admin_conns:
+                    new_product_key_json = message.data.get('product_keys', None)
+                    if new_product_key_json is not None:
+                        with open('./product_keys.json','w') as f:
+                            json.dump(new_product_key_json, f)
+                        response = {"response": "complete"}
+                        system.send_to_conn(from_conn, response)
 
         else:
             logging.info(f"message is_dict:{message.is_dict}, is_pickled:{message.is_pickled}")
