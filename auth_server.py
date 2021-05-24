@@ -14,6 +14,11 @@ import time
 
 
 
+with open('auth_server.pass','r') as f:
+    auth_server_pass = f.readline().strip()
+
+
+
 def get_active_product_keys() -> list:
     logging.info("function: get_active_product_keys() called")
 
@@ -48,6 +53,7 @@ def get_active_product_keys() -> list:
     return product_keys
 
 
+
 server_addr = (
     connections.getLocalIP(),
     13294
@@ -68,6 +74,8 @@ while server_running:
 
     clients, messages, disconnected = system.main()
 
+    admin_conns = []
+
     for new_client in clients:
         conn, addr = new_client
         logging.info(f"client connection from {addr[0]}:{addr[1]}")
@@ -77,9 +85,13 @@ while server_running:
         if message.is_dict:
             logging.info(f"dict message {str(message.data)}, {str(message.from_conn)}")
 
+            from_conn = message.from_conn
+
             active_product_keys = get_active_product_keys()
 
-            if message.data.get('event',None) == 'validate_key':
+            event = message.data.get('event',None)
+
+            if event == 'validate_key':
                 # verify the provided key
                 machine_key = message.data.get('key',None)
                 found_key = None
@@ -102,9 +114,32 @@ while server_running:
                     system.send_to_conn(message.from_conn, response)
                 except Exception as e:
                     logging.warning(f"failed to send response message {e}")
+            
+            elif event == 'admin_auth':
+                passphrase = message.data.get('pass',None)
+
+                if passphrase == auth_server_pass:
+                    if from_conn is not None:
+                        admin_conns.append(from_conn)
+                    response = {"response": "success"}
+                    logging.log(f"conn authorised as admin: {from_conn}")
+                else:
+                    response = {"response": "fail"}
+                    logging.log(f"conn authorised as admin: {from_conn}")
+                system.send_to_conn(from_conn, response)
+            
+            elif event == 'admin_ping':
+                if from_conn in admin_conns:
+                    response = {"response": "pong"}
+                else:
+                    response = {"response": "auth_needed"}
+                system.send_to_conn(from_conn, response)
 
         else:
             logging.info(f"message is_dict:{message.is_dict}, is_pickled:{message.is_pickled}")
     
     for client in disconnected:
+        client_conn = client[0]
+        if client_conn in admin_conns:
+            admin_conns.remove(client_conn)
         logging.info(f"client disconnected {client[1][0]}:{client[1][1]}")
