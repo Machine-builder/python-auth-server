@@ -48,9 +48,6 @@ def get_active_product_keys() -> list:
     return product_keys
 
 
-active_product_keys = get_active_product_keys()
-print(active_product_keys[0].key, active_product_keys[0].valid_until, active_product_keys[0].created_at)
-
 
 server_addr = (
     connections.getLocalIP(),
